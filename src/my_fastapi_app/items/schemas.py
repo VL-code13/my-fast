@@ -1,3 +1,4 @@
+# src/my_fastapi_app/items/schemas.py
 """
 Pydantic-схемы для домена "items".
 
@@ -5,7 +6,9 @@ Pydantic-схемы для домена "items".
 Они не являются моделями БД. Это DTO (Data Transfer Object).
 """
 
-from pydantic import BaseModel, Field
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ItemBase(BaseModel):
@@ -40,3 +43,10 @@ class ItemResponse(ItemBase):
     """
 
     id: int = Field(..., description="Уникальный идентификатор элемента")
+    created_at: datetime = Field(..., description="Дата создания (UTC)")
+
+    # from_attributes=True — ключевая настройка для сериализации ORM-объектов.
+    # Без неё FastAPI попытается прочитать поля как элементы словаря
+    # (item["id"]) и упадёт с ResponseValidationError, потому что ORM-объект —
+    # это не dict, а объект с атрибутами (item.id).
+    model_config = ConfigDict(from_attributes=True)
