@@ -1,12 +1,44 @@
-# Python-generated files
+# Виртуальное окружение и Python-специфичные папки
+.venv/
+venv/
+
+# Кэш интерпретатора и скомпилированные файлы
 __pycache__/
-*.py[oc]
-build/
+*.pyc
+
+# Артефакты тестирования и покрытия кода
+.pytest_cache/
+htmlcov/
+
+# Файлы окружения (конфиденциальные данные: пароли, ключи)
+.env
+*.env.local
+
+# Логи и временные файлы
+*.log
+*.tmp
+
+# Директории, создаваемые средами разработки
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Файлы и папки, специфичные для инструментов
+*.db
+*.sqlite
+
+# Артефакты упаковки
 dist/
-wheels/
-*.egg-info
+*.egg-info/
 
-# Virtual environments
-.venv
+# Контрольные точки Jupyter Notebook (если работаете с интерактивным кодом)
+.ipynb_checkpoints/
 
-.idea
+# Локальные дампы и кэш инструментов
+*.dump
+.cache/
+
+# Системные файлы (macOS .DS_Store, Windows Thumbs.db)
+.DS_Store
+Thumbs.db
