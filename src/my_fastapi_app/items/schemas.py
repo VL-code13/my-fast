@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 class ItemBase(BaseModel):
     """Базовая схема с общими полями."""
+
     name: str = Field(
         ...,
         min_length=1,
@@ -27,18 +28,15 @@ class ItemBase(BaseModel):
 
 class ItemCreate(ItemBase):
     """
-        Схема для создания элемента (POST-запрос).
-        Наследует все поля из ItemBase.
+    Схема для создания элемента (POST-запрос).
+    Наследует все поля из ItemBase.
     """
-    pass
 
 
 class ItemResponse(ItemBase):
     """
-        Схема для ответа API (то, что видит клиент).
-        Добавляет поля, которые генерируются на сервере.
+    Схема для ответа API (то, что видит клиент).
+    Добавляет поля, которые генерируются на сервере.
     """
-    id: int = Field(
-        ...,
-        description="Уникальный идентификатор элемента"
-    )
+
+    id: int = Field(..., description="Уникальный идентификатор элемента")

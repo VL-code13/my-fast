@@ -2,48 +2,82 @@
 """
 Сервисный слой для домена "items".
 
-Здесь находится бизнес-логика. В идеале, этот слой не должен ничего
-знать о HTTP (FastAPI) и о том, как данные хранятся (SQLAlchemy).
-Он оперирует абстрактными понятиями.
+Здесь бизнес-логика: работа с БД, транзакции, валидация на уровне домена.
+Слой ничего не знает о HTTP.
 """
 
-from typing import List, Optional, Dict
-from .schemas import ItemCreate, ItemResponse
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-# Временное in-memory хранилище. Позже мы заменим его на БД.
-# Аннотация Dict[int, ItemResponse] говорит mypy, что это словарь.
-_fake_db: Dict[int, ItemResponse] = {}
-_last_id: int = 0
+from .models import Item
+from .schemas import ItemCreate
 
 
-def get_item() -> List[ItemResponse]:
-    """Возвращает список всех элементов."""
-
-    return list(_fake_db.values())
-
-def get_item(item_create: ItemCreate) -> ItemResponse:
+async def get_items(db: AsyncSession) -> list[Item]:
     """
-        Создаёт новый элемент.
-        Генерирует ID и сохраняет в "базу".
+    Возвращает список всех элементов.
+
+    Заметь: параметр db — это сессия, которую передаст FastAPI через Depends.
+    Функция async, потому что db.execute — корутина.
     """
-    global _last_id
-    _last_id += 1
-    item = ItemResponse(id=_last_id, **item_create.model_dump())
-    _fake_db[item.id] = item
+    # select(Item) — SQLAlchemy 2.0-стиль. Эквивалент SELECT * FROM items.
+    # await db.execute(...) — выполняет запрос к БД.
+    # result.scalars().all() — извлекает объекты Item из результата.
+    result = await db.execute(select(Item).order_by(Item.id))
+    return list(result.scalars().all())
+
+
+async def get_item_by_id(db: AsyncSession, item_id: int) -> Item | None:
+    """
+    Находит элемент по ID.
+
+    Возвращает объект Item или None, если не найден.
+    """
+    # db.get(Item, item_id) — оптимальный способ получить по PK.
+    # SQLAlchemy сначала смотрит в identity map (кэш сессии),
+    # и только потом идёт в БД. Это быстрее, чем select().where().
+    return await db.get(Item, item_id)
+
+
+async def create_item(db: AsyncSession, item_in: ItemCreate) -> Item:
+    """
+    Создаёт новый элемент.
+
+    Транзакция:
+      1. Создаём ORM-объект из Pydantic-схемы.
+      2. Добавляем в сессию.
+      3. Коммитим — данные идут в БД.
+      4. refresh — читаем сгенерированные БД поля (id, created_at).
+    """
+    # model_dump() — превращает Pydantic-модель в dict.
+    # ** распаковывает dict в именованные аргументы.
+    item = Item(**item_in.model_dump())
+
+    # add() — помещает объект в сессию (ещё не в БД).
+    db.add(item)
+
+    # commit() — фиксирует транзакцию. Все изменения уходят в БД.
+    await db.commit()
+
+    # refresh() — перечитывает объект из БД. Нужен, чтобы получить
+    # значения, сгенерированные БД (id, created_at).
+    await db.refresh(item)
+
     return item
 
-def delete_item(item_id: int) -> bool:
-    """
-        Удаляет элемент по ID.
-        Возвращает True, если элемент был удалён, иначе False.
-    """
-    if item_id in _fake_db:
-        del _fake_db[item_id]
-        return True
-    return False
-"""
-Изоляция: Сервисный слой ничего не знает о Request, Response или HTTPException. Это позволяет легко тестировать бизнес-логику в отрыве от веб-фреймворка.
 
-Переиспользование: Эти же функции можно будет вызывать из фоновой задачи или из CLI-скрипта.
-"""
+async def delete_item(db: AsyncSession, item_id: int) -> bool:
+    """
+    Удаляет элемент по ID.
 
+    Возвращает True, если удалён, иначе False.
+    """
+    item = await db.get(Item, item_id)
+    if item is None:
+        return False
+
+    # await db.delete(item) — помечает объект на удаление.
+    # Реальное удаление произойдёт при commit().
+    await db.delete(item)
+    await db.commit()
+    return True
